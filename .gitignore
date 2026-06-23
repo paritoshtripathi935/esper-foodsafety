@@ -1,0 +1,52 @@
+# ── Planning / design artifacts (local only, not for the repo) ────────────────
+plan/
+diagrams/
+design/
+
+# ── Environment secrets — never commit ───────────────────────────────────────
+.env
+.env.local
+frontend/.env
+frontend/.env.local
+*.env
+!*.env.example
+
+# ── Supabase local dev ────────────────────────────────────────────────────────
+supabase/.temp/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.vite/
+
+# ── Android ───────────────────────────────────────────────────────────────────
+.gradle/
+*.apk
+*.aab
+local.properties
+.idea/
+.kotlin/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Large binaries ────────────────────────────────────────────────────────────
+*.tar.gz
+openjdk.tar.gz
+
+# ── Claude Code internal ──────────────────────────────────────────────────────
+.claude/
