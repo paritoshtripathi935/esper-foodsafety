@@ -29,6 +29,10 @@ export default function CommandPalette({ sites, devices, onSeedDemo }: Props) {
         e.preventDefault()
         setOpen((v) => !v)
       }
+      if (e.key === 'Escape') {
+        setOpen(false)
+        setQuery('')
+      }
     }
     function onOpen() { setOpen(true) }
     window.addEventListener('keydown', onKey)
@@ -58,10 +62,9 @@ export default function CommandPalette({ sites, devices, onSeedDemo }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onMouseDown={close} />
 
       {/* Palette */}
       <div className="relative w-full max-w-[520px] mx-4">
