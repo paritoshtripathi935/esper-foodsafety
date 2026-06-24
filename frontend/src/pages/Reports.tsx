@@ -18,8 +18,6 @@ import { uploadPdf, listPdfs, presignPdf } from '../services/ai'
 import type { S3PdfFile } from '../services/ai'
 import type { FoodSafetyEvent, Site, Station } from '../types'
 
-// ─── outlet context ───────────────────────────────────────────────────────────
-
 interface ShellContext {
   events: FoodSafetyEvent[]
   sites: Site[]
@@ -30,19 +28,18 @@ interface ShellContext {
   handleSeedDemo: () => Promise<void>
 }
 
-// ─── per-day export button (inline, not reusing PDFExportButton to allow
-//     passing addToast from context) ──────────────────────────────────────────
+// ─── ExportButton ─────────────────────────────────────────────────────────────
 
 interface ExportButtonProps {
   events: FoodSafetyEvent[]
   siteId: string
-  date: string          // yyyy-MM-dd
+  date: string
   addToast: (msg: string) => void
-  small?: boolean
+  size?: 'sm' | 'md' | 'lg'
   onUploaded?: () => void
 }
 
-function ExportButton({ events, siteId, date, addToast, small, onUploaded }: ExportButtonProps) {
+function ExportButton({ events, siteId, date, addToast, size = 'md', onUploaded }: ExportButtonProps) {
   const [loading, setLoading] = useState(false)
 
   async function handleExport() {
@@ -52,7 +49,6 @@ function ExportButton({ events, siteId, date, addToast, small, onUploaded }: Exp
         <HACCPReport events={events} siteId={siteId} date={date} />
       ).toBlob()
 
-      // local download
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -60,7 +56,6 @@ function ExportButton({ events, siteId, date, addToast, small, onUploaded }: Exp
       a.click()
       URL.revokeObjectURL(url)
 
-      // upload to S3 via EC2
       try {
         const result = await uploadPdf(blob, siteId, date)
         addToast(`Saved to S3: ${result.bucket}/${result.key}`)
@@ -75,34 +70,42 @@ function ExportButton({ events, siteId, date, addToast, small, onUploaded }: Exp
     }
   }
 
+  const sizeClasses = {
+    sm:  'px-2.5 py-1 text-xs',
+    md:  'px-4 py-2 text-sm',
+    lg:  'px-5 py-2.5 text-base font-semibold',
+  }
+  const iconSize = size === 'sm' ? 'w-3 h-3' : size === 'lg' ? 'w-5 h-5' : 'w-4 h-4'
+  const spinSize = size === 'sm' ? 'w-3 h-3' : size === 'lg' ? 'w-5 h-5' : 'w-4 h-4'
+
   return (
     <button
       onClick={handleExport}
       disabled={loading}
       className={clsx(
-        'flex items-center gap-1.5 rounded-lg font-semibold transition-colors',
+        'flex items-center gap-2 rounded-lg font-semibold transition-colors',
         'bg-primary-container text-on-primary hover:bg-primary/80 disabled:opacity-60 disabled:cursor-not-allowed',
-        small ? 'px-2.5 py-1 text-xs' : 'px-4 py-2 text-sm'
+        sizeClasses[size],
       )}
     >
       {loading ? (
-        <div className={clsx('border-2 border-on-primary border-t-transparent rounded-full animate-spin', small ? 'w-3 h-3' : 'w-4 h-4')} />
+        <div className={clsx('border-2 border-on-primary border-t-transparent rounded-full animate-spin', spinSize)} />
       ) : (
-        <svg className={small ? 'w-3 h-3' : 'w-4 h-4'} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className={iconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       )}
-      {small ? 'PDF' : 'Export PDF'}
+      {size === 'sm' ? 'PDF' : size === 'lg' ? `Export Today · ${format(parseISO(date), 'MMM d')}` : 'Export PDF'}
     </button>
   )
 }
 
-// ─── day card ─────────────────────────────────────────────────────────────────
+// ─── DayCard ──────────────────────────────────────────────────────────────────
 
 interface DayCardProps {
-  date: string  // yyyy-MM-dd
+  date: string
   dayEvents: FoodSafetyEvent[]
-  siteId: string  // 'all' or a real site id
+  siteId: string
   addToast: (msg: string) => void
   onUploaded?: () => void
 }
@@ -114,7 +117,6 @@ function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps
   const cas    = dayEvents.filter((e) => e.type === 'corrective_action')
   const compliant = alerts.length === 0
 
-  // group by station for expanded view
   const byStation = useMemo(() => {
     const map = new Map<string, FoodSafetyEvent[]>()
     for (const e of dayEvents) {
@@ -125,18 +127,14 @@ function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps
   }, [dayEvents])
 
   const dateLabel = format(parseISO(date), 'EEE, MMM d')
-  const exportSiteId = siteId === 'all'
-    ? (dayEvents[0]?.site_id ?? 'site-eastgate')
-    : siteId
+  const exportSiteId = siteId === 'all' ? (dayEvents[0]?.site_id ?? 'site-eastgate') : siteId
 
   return (
-    <div className="bg-surface-container overflow-hidden">
-      {/* Main row */}
+    <div>
       <div
         className="flex items-center gap-4 px-4 py-2.5 cursor-pointer hover:bg-surface-container-high transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
-        {/* Chevron */}
         <svg
           className={clsx('w-4 h-4 shrink-0 text-on-surface-variant transition-transform', expanded && 'rotate-90')}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
@@ -144,7 +142,6 @@ function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
 
-        {/* Date */}
         <p className="font-semibold text-on-surface w-40 shrink-0">
           {dateLabel}
           {isToday(parseISO(date)) && (
@@ -152,14 +149,12 @@ function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps
           )}
         </p>
 
-        {/* Stats */}
         <div className="flex items-center gap-4 text-xs text-on-surface-variant">
           <span>{dayEvents.length} events</span>
           <span>{alerts.length} alert{alerts.length !== 1 ? 's' : ''}</span>
           <span>{cas.length} CA{cas.length !== 1 ? 's' : ''}</span>
         </div>
 
-        {/* Status pill */}
         <span className={clsx(
           'ml-2 px-2 py-0.5 rounded-full text-xs font-semibold shrink-0',
           compliant ? 'bg-primary/10 text-primary' : 'bg-error-container text-error'
@@ -173,13 +168,12 @@ function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps
             siteId={exportSiteId}
             date={date}
             addToast={addToast}
-            small
+            size="sm"
             onUploaded={onUploaded}
           />
         </div>
       </div>
 
-      {/* Expanded: events by station */}
       {expanded && (
         <div className="border-t border-outline-variant divide-y divide-outline-variant/50">
           {byStation.map(([station, evts]) => {
@@ -220,19 +214,20 @@ function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps
   )
 }
 
-// ─── Reports ─────────────────────────────────────────────────────────────────
+// ─── formatBytes ──────────────────────────────────────────────────────────────
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`
   return `${Math.round(bytes / 1024)} KB`
 }
 
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
 export default function Reports() {
   const { events, sites, selectedSite, addToast, handleSeedDemo } =
     useOutletContext<ShellContext>()
 
   const [siteFilter, setSiteFilter] = useState<string>(selectedSite ?? '')
-
   const [s3Files, setS3Files] = useState<S3PdfFile[]>([])
   const [s3Loading, setS3Loading] = useState(false)
   const [s3Error, setS3Error] = useState<string | null>(null)
@@ -251,8 +246,6 @@ export default function Reports() {
   }, [siteFilter])
 
   const today = format(new Date(), 'yyyy-MM-dd')
-
-  // filter events to selected site + last 30 days
   const windowStart = startOfDay(subDays(new Date(), 29))
   const windowEnd   = endOfDay(new Date())
 
@@ -266,7 +259,6 @@ export default function Reports() {
     [events, siteFilter, windowStart, windowEnd]
   )
 
-  // group by date string yyyy-MM-dd, newest first
   const byDate = useMemo(() => {
     const map = new Map<string, FoodSafetyEvent[]>()
     for (const e of windowEvents) {
@@ -274,67 +266,128 @@ export default function Reports() {
       if (!map.has(d)) map.set(d, [])
       map.get(d)!.push(e)
     }
-    // sort dates descending
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a))
   }, [windowEvents])
 
+  // ── compliance stats ────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const alerts30 = windowEvents.filter((e) => e.type === 'alert').length
+    const cas30    = windowEvents.filter((e) => e.type === 'corrective_action').length
+    const activeDays = byDate.length
+    const compliance = (100 - (alerts30 / Math.max(windowEvents.length, 1)) * 100).toFixed(1)
+
+    const last7Start  = startOfDay(subDays(new Date(), 6))
+    const prior7Start = startOfDay(subDays(new Date(), 13))
+    const prior7End   = endOfDay(subDays(new Date(), 6))
+
+    const alerts7 = windowEvents.filter(
+      (e) => e.type === 'alert' && parseISO(e.ts) >= last7Start
+    ).length
+    const alertsPrior7 = events.filter((e) => {
+      if (siteFilter && e.site_id !== siteFilter) return false
+      const d = parseISO(e.ts)
+      return e.type === 'alert' && d >= prior7Start && d <= prior7End
+    }).length
+
+    const trendDelta = alertsPrior7 - alerts7
+    let trend: { label: string; up: boolean } | null = null
+    if (alertsPrior7 > alerts7) {
+      trend = { label: `↑ ${trendDelta} fewer breach${trendDelta !== 1 ? 'es' : ''} than last 7 days`, up: true }
+    } else if (alerts7 > alertsPrior7) {
+      const n = alerts7 - alertsPrior7
+      trend = { label: `↓ ${n} more breach${n !== 1 ? 'es' : ''} than last 7 days`, up: false }
+    }
+
+    return { alerts30, cas30, activeDays, compliance, trend }
+  }, [windowEvents, byDate, events, siteFilter])
+
   const exportSiteId = siteFilter || (sites[0]?.id ?? 'site-eastgate')
-  const todayEvents  = windowEvents.filter(
-    (e) => format(parseISO(e.ts), 'yyyy-MM-dd') === today
-  )
+  const todayEvents  = windowEvents.filter((e) => format(parseISO(e.ts), 'yyyy-MM-dd') === today)
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-7xl">
+    <div className="flex flex-col gap-6 p-6 max-w-[1400px]">
 
       {/* ── Header strip ── */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">HACCP Reports</h1>
-          <p className="text-sm text-on-surface-variant mt-0.5">Daily compliance log</p>
+      <div className="sticky top-0 z-10 bg-surface-container/95 backdrop-blur border-b border-outline-variant -mx-6 px-6 py-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div>
+            <h1 className="text-xl font-bold text-on-surface">HACCP Reports</h1>
+            <p className="text-sm text-on-surface-variant mt-0.5">Daily compliance log</p>
+          </div>
+
+          <select
+            value={siteFilter}
+            onChange={(e) => setSiteFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm bg-surface-container-high border border-outline-variant
+              text-on-surface focus:outline-none focus:border-primary cursor-pointer"
+          >
+            <option value="">All sites</option>
+            {sites.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={refreshS3}
+            title="Refresh S3 file list"
+            className="p-1.5 rounded-lg text-on-surface-variant border border-outline-variant
+              hover:bg-surface-container-high transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
+      </div>
 
-        {/* Site selector */}
-        <select
-          value={siteFilter}
-          onChange={(e) => setSiteFilter(e.target.value)}
-          className="px-3 py-1.5 rounded-lg text-sm bg-surface-container-high border border-outline-variant
-            text-on-surface focus:outline-none focus:border-primary cursor-pointer"
-        >
-          <option value="">All sites</option>
-          {sites.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-
-        {/* Refresh S3 list */}
-        <button
-          onClick={refreshS3}
-          title="Refresh S3 file list"
-          className="p-1.5 rounded-lg text-on-surface-variant border border-outline-variant
-            hover:bg-surface-container-high transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
-
-        {/* CTA — today's report */}
-        <div className="ml-auto">
-          <ExportButton
-            events={todayEvents}
-            siteId={exportSiteId}
-            date={today}
-            addToast={addToast}
-            onUploaded={refreshS3}
-          />
+      {/* ── 30-day compliance headline ── */}
+      <div className="flex items-center gap-6 p-6 rounded-2xl border border-outline-variant bg-surface-container">
+        <div className="flex items-baseline gap-2 shrink-0">
+          <span className="font-mono text-5xl font-bold text-on-surface">{stats.compliance}%</span>
+          <span className="text-sm text-on-surface-variant">compliant</span>
         </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-on-surface">
+            {stats.alerts30} alert{stats.alerts30 !== 1 ? 's' : ''} · {stats.cas30} corrective action{stats.cas30 !== 1 ? 's' : ''} across {stats.activeDays} active day{stats.activeDays !== 1 ? 's' : ''}
+          </p>
+          <p className="text-xs text-on-surface-variant mt-0.5">Last 30 days</p>
+        </div>
+        {stats.trend && (
+          <span className={clsx(
+            'shrink-0 px-3 py-1 rounded-full text-xs font-semibold',
+            stats.trend.up ? 'bg-primary/10 text-primary' : 'bg-error-container text-error'
+          )}>
+            {stats.trend.label}
+          </span>
+        )}
       </div>
 
       {/* ── Two-column body ── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
 
-        {/* Column A: past-30-days list */}
-        <section className="flex flex-col gap-2">
+        {/* Column A: export CTA + day list */}
+        <section className="flex flex-col gap-3">
+
+          {/* Sticky export banner */}
+          <div className="sticky top-0 z-10 -mx-1 px-1 pt-1 pb-3 bg-surface">
+            <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-outline-variant bg-surface-container-high">
+              <div>
+                <p className="text-sm font-semibold text-on-surface">Today's HACCP Report</p>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  {todayEvents.length} event{todayEvents.length !== 1 ? 's' : ''} · {format(new Date(), 'EEE, MMM d yyyy')}
+                </p>
+              </div>
+              <ExportButton
+                events={todayEvents}
+                siteId={exportSiteId}
+                date={today}
+                addToast={addToast}
+                size="lg"
+                onUploaded={refreshS3}
+              />
+            </div>
+          </div>
+
           <h2 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wide">
             Last 30 days
           </h2>
@@ -346,7 +399,7 @@ export default function Reports() {
               onSeed={handleSeedDemo}
             />
           ) : (
-            <div className="flex flex-col divide-y divide-outline-variant/30 rounded-xl overflow-hidden border border-outline-variant">
+            <div className="rounded-2xl border border-outline-variant bg-surface-container divide-y divide-outline-variant overflow-hidden">
               {byDate.map(([date, dayEvts]) => (
                 <DayCard
                   key={date}

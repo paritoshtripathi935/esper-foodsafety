@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
+import Breadcrumb from '../components/common/Breadcrumb'
 import { format, formatDistanceToNow, isToday, parseISO } from 'date-fns'
 import clsx from 'clsx'
 import { useRegistry } from '../hooks/useRegistry'
@@ -161,29 +162,28 @@ export default function DeviceDetail() {
   const ds = deviceStatus(device.last_seen)
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-5xl">
+    <div className="flex flex-col gap-6 p-6 max-w-[1400px]">
 
       {/* ── Header ── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Link
-          to={`/sites/${siteId}`}
-          className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          {site?.name ?? 'Site'}
-        </Link>
+      <div className="sticky top-0 z-10 bg-surface-container/95 backdrop-blur border-b border-outline-variant -mx-6 px-6 py-4">
+        <div className="flex flex-col gap-2">
+          <Breadcrumb trail={[
+            { label: 'Sites', to: '/sites' },
+            { label: site?.name ?? 'Site', to: `/sites/${siteId}` },
+            { label: device.name },
+          ]} />
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold text-on-surface">{device.name}</h1>
 
-        <h1 className="text-2xl font-bold text-on-surface">{device.name}</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-container-high text-on-surface-variant border border-outline-variant">
+              {KIND_LABEL[device.kind]}
+            </span>
 
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-container-high text-on-surface-variant border border-outline-variant">
-          {KIND_LABEL[device.kind]}
-        </span>
-
-        <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-semibold', STATUS_PILL[ds])}>
-          {ds}
-        </span>
+            <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-semibold', STATUS_PILL[ds])}>
+              {ds}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* ── KPI strip ── */}

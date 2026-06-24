@@ -143,3 +143,35 @@ async def store_pdf(
     data = await file.read()
     key = f"haccp/{site_id}/{date}.pdf"
     return s3_store.put_object(key=key, data=data, content_type="application/pdf")
+
+
+# ── static frontend (built React SPA) ──────────────────────────────────────────
+# Serves the Vite build from ./static. The SPA catch-all MUST be registered last
+# so it doesn't shadow the API routes above.
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+INDEX_HTML = os.path.join(STATIC_DIR, "index.html")
+
+if os.path.isdir(STATIC_DIR):
+    assets_dir = os.path.join(STATIC_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/favicon.svg", include_in_schema=False)
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def _favicon():
+        path = os.path.join(STATIC_DIR, "favicon.svg")
+        if os.path.isfile(path):
+            return FileResponse(path, media_type="image/svg+xml")
+        raise HTTPException(status_code=404)
+
+    # SPA fallback — any unmatched GET returns index.html so BrowserRouter
+    # can handle client-side routing. Registered last on purpose.
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def _spa(full_path: str):
+        candidate = os.path.join(STATIC_DIR, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(INDEX_HTML)

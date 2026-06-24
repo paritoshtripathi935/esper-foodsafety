@@ -37,6 +37,13 @@ export function useDerivedStationState(
       const tempEvent = sorted.find((e) => e.type === 'temp')
       const latestTemp = tempEvent != null ? Number(tempEvent.value) : null
 
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000)
+      const recentTemps = stationEvents
+        .filter((e) => e.type === 'temp' && new Date(e.ts) >= thirtyMinAgo)
+        .sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime())
+        .slice(-30)
+        .map((e) => Number(e.value))
+
       const timerStarts = sorted.filter(
         (e) => e.type === 'timer' && (e.payload as Record<string, unknown>)?.event === 'start'
       )
@@ -72,7 +79,7 @@ export function useDerivedStationState(
         if (!hasCA) activeAlert = latestAlert
       }
 
-      states.push({ station: slug, name, site_id, latestTemp, openTimer, activeAlert })
+      states.push({ station: slug, name, site_id, latestTemp, recentTemps, openTimer, activeAlert })
     }
 
     return states.sort((a, b) => a.name.localeCompare(b.name))

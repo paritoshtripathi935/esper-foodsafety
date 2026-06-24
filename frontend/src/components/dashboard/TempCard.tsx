@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import type { StationState } from '../../types'
 import AlertBadge from './AlertBadge'
 import TimerCard from './TimerCard'
+import MiniSparkline from './MiniSparkline'
 
 const TEMP_MAX = 41
 const TEMP_WARN = 40
@@ -37,7 +38,7 @@ interface Props {
 }
 
 export default function TempCard({ state }: Props) {
-  const { name, latestTemp, openTimer, activeAlert } = state
+  const { name, latestTemp, recentTemps, openTimer, activeAlert } = state
   const status = statusColor(latestTemp, activeAlert !== null)
   const cls = STATUS_CLASSES[status]
 
@@ -76,6 +77,12 @@ export default function TempCard({ state }: Props) {
       </div>
 
       {openTimer && <TimerCard timer={openTimer} />}
+
+      {recentTemps.length >= 2 && (
+        <div className="flex justify-end">
+          <MiniSparkline data={recentTemps} status={status} />
+        </div>
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import SitesTree from "./SitesTree";
 import AlertsFeed from "../components/alerts/AlertsFeed";
 import AlertDetail from "../components/alerts/AlertDetail";
 import ErrorToast, { useToasts } from "../components/common/ErrorToast";
+import CommandPalette from "../components/common/CommandPalette";
 import { seedDemo } from "../utils/seed-demo";
 import type { FoodSafetyEvent, Site } from "../types";
 
@@ -180,6 +181,18 @@ export default function AppShell() {
               SafeTemp
             </span>
           </div>
+          <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))}
+            className="mt-3 flex items-center gap-1.5 px-2 py-1 rounded-lg w-full
+              bg-surface-container-high border border-outline-variant
+              text-xs text-on-surface-variant hover:text-on-surface hover:border-primary/50 transition-colors"
+          >
+            <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+            </svg>
+            <span className="flex-1 text-left">Search…</span>
+            <kbd className="font-mono text-[10px] font-semibold opacity-60">⌘K</kbd>
+          </button>
         </div>
 
         {/* Nav items */}
@@ -267,6 +280,7 @@ export default function AppShell() {
         />
       )}
 
+      <CommandPalette sites={sites} devices={devices} onSeedDemo={handleSeedDemo} />
       <ErrorToast toasts={toasts} onDismiss={dismissToast} />
     </div>
   );

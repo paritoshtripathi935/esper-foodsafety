@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
+import Breadcrumb from '../components/common/Breadcrumb'
 import { format, formatDistanceToNow, parseISO, subHours } from 'date-fns'
 import clsx from 'clsx'
 import {
@@ -181,56 +182,48 @@ export default function StationDetail() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-5xl">
+    <div className="flex flex-col gap-6 p-6 max-w-[1400px]">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Back link */}
-          <Link
-            to={`/sites/${siteId}`}
-            className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            {site?.name ?? 'Site'}
-          </Link>
+      <div className="sticky top-0 z-10 bg-surface-container/95 backdrop-blur border-b border-outline-variant -mx-6 px-6 py-4">
+        <div className="flex flex-col gap-2">
+          <Breadcrumb trail={[
+            { label: 'Sites', to: '/sites' },
+            { label: site?.name ?? 'Site', to: `/sites/${siteId}` },
+            { label: stationName },
+          ]} />
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold text-on-surface">{stationName}</h1>
 
-          <h1 className="text-2xl font-bold text-on-surface">{stationName}</h1>
+            {/* Zone badge */}
+            {stationRecord && (
+              <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-semibold', ZONE_PILL[stationRecord.zone])}>
+                {ZONE_LABEL[stationRecord.zone]}
+              </span>
+            )}
 
-          {/* Zone badge */}
-          {stationRecord && (
-            <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-semibold', ZONE_PILL[stationRecord.zone])}>
-              {ZONE_LABEL[stationRecord.zone]}
-            </span>
-          )}
-
-          {/* Current temp */}
-          {currentTemp !== null && (
-            <span className="ml-auto font-mono text-3xl font-bold text-on-surface tabular-nums">
-              {currentTemp.toFixed(1)}
-              <span className="text-xl text-on-surface-variant">°F</span>
-            </span>
-          )}
-        </div>
-
-        {/* Threshold chip */}
-        {stationRecord && (
-          <div className="flex items-center gap-2">
-            {stationRecord.max_temp_f != null && (
+            {/* Threshold chips */}
+            {stationRecord?.max_temp_f != null && (
               <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs
                 bg-error-container/40 text-error border border-error/20">
                 Max {stationRecord.max_temp_f}°F
               </span>
             )}
-            {stationRecord.min_temp_f != null && (
+            {stationRecord?.min_temp_f != null && (
               <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs
                 bg-tertiary/10 text-tertiary border border-tertiary/20">
                 Min {stationRecord.min_temp_f}°F
               </span>
             )}
+
+            {/* Current temp */}
+            {currentTemp !== null && (
+              <span className="ml-auto font-mono text-3xl font-bold text-on-surface tabular-nums">
+                {currentTemp.toFixed(1)}
+                <span className="text-xl text-on-surface-variant">°F</span>
+              </span>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* ── Chart card ── */}
