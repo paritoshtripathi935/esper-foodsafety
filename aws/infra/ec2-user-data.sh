@@ -1,6 +1,7 @@
 #!/bin/bash
 # EC2 user-data: install deps and start the AI service on port 8000.
 # Runs as root on first boot (Amazon Linux 2023).
+# Access: AWS Session Manager (no SSH port needed).
 set -euxo pipefail
 
 # ── system deps ───────────────────────────────────────────────────────────────
@@ -14,8 +15,7 @@ cp -r /tmp/repo/aws/ai-service "$APP_DIR"
 # ── python deps ───────────────────────────────────────────────────────────────
 python3.12 -m pip install --no-cache-dir -r "$APP_DIR/requirements.txt"
 
-# ── copy .env (pre-baked into the AMI or injected via SSM Parameter Store) ───
-# Uncomment and adapt if not using instance role:
+# ── .env (fill in before launch, or inject via SSM Parameter Store) ──────────
 # cp /tmp/.env "$APP_DIR/.env"
 
 # ── systemd service ───────────────────────────────────────────────────────────

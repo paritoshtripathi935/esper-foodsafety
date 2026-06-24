@@ -1,9 +1,14 @@
 import json
+import logging
 import os
+
 import boto3
 
 _client = None
 
+SEVERITY_VALID = {"low", "medium", "high", "critical"}
+
+# ── low-level client ──────────────────────────────────────────────────────────
 
 def _get_client():
     global _client
@@ -63,3 +68,120 @@ def invoke_with_tool(prompt: str, system: str, tool: dict, max_tokens: int = 102
         if block.get("type") == "tool_use":
             return block["input"]
     raise ValueError("No tool_use block in Bedrock response")
+
+
+# ── /ai/structure-note (AI-4 + AI-5) ─────────────────────────────────────────
+
+_STRUCTURE_NOTE_TOOL = {
+    "name": "structure_corrective_action",
+    "description": "Extract structured fields from a food-safety corrective-action transcript.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "action_taken": {
+                "type": "string",
+                "description": "What was done to correct the issue",
+            },
+            "root_cause": {
+                "type": "string",
+                "description": "Why the issue occurred",
+            },
+            "disposition": {
+                "type": "string",
+                "description": "What happened to the affected product (e.g. discarded, held, used)",
+            },
+            "severity": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"],
+                "description": (
+                    "Severity of the food-safety incident. "
+                    "Use high/critical for illness reports, large temperature violations, or product discards. "
+                    "Use low/medium for minor deviations corrected quickly with no product loss."
+                ),
+            },
+        },
+        "required": ["action_taken", "root_cause", "disposition", "severity"],
+    },
+}
+
+_STRUCTURE_NOTE_SYSTEM = (
+    "You are a food-safety HACCP assistant. Extract structured fields from the corrective-action transcript. "
+    "severity MUST be exactly one of: low, medium, high, critical — never any other value. "
+    "Bias toward high or critical when product was discarded, illness was reported, or a significant temperature breach occurred."
+)
+
+
+def structure_note(transcript: str, device_id: str, site_id: str, station: str) -> dict:
+    """Call Bedrock tool-use to structure a corrective-action transcript.
+
+    Never raises — returns a safe high-severity fallback on any error.
+    """
+    prompt = (
+        f"Station: {station} | Device: {device_id} | Site: {site_id}\n\n"
+        f"Corrective-action transcript:\n{transcript}"
+    )
+    try:
+        raw = invoke_with_tool(
+            prompt=prompt,
+            system=_STRUCTURE_NOTE_SYSTEM,
+            tool=_STRUCTURE_NOTE_TOOL,
+            max_tokens=512,
+        )
+        severity = raw.get("severity", "high")
+        if severity not in SEVERITY_VALID:
+            logging.warning("Bedrock returned invalid severity %r — coercing to 'high'", severity)
+            severity = "high"
+        return {
+            "action_taken": raw.get("action_taken", ""),
+            "root_cause": raw.get("root_cause", ""),
+            "disposition": raw.get("disposition", ""),
+            "severity": severity,
+            "narrative": "",
+        }
+    except Exception as exc:
+        logging.error("structure_note Bedrock error: %s", exc)
+        return {
+            "action_taken": "Unable to parse — manual review required",
+            "root_cause": "Bedrock unavailable",
+            "disposition": "unknown",
+            "severity": "high",
+            "narrative": "",
+        }
+
+
+# ── /ai/narrate (AI-6) ────────────────────────────────────────────────────────
+
+_NARRATE_SYSTEM = (
+    "You are a food-safety HACCP assistant writing official audit records. "
+    "Write a single concise paragraph (3–5 sentences) grounded strictly in the provided incident data. "
+    "Do not invent facts, times, quantities, or names not present in the input. "
+    "Use past tense. Cite actual values from the data (temperatures, times, product names)."
+)
+
+
+def narrate(alert: dict, corrective_action: dict, temp_slice: list) -> str:
+    """Generate an audit-grade narrative paragraph for an incident."""
+    prompt = (
+        "Generate an audit narrative for this food-safety incident.\n\n"
+        f"Alert: {json.dumps(alert)}\n"
+        f"Corrective action: {json.dumps(corrective_action)}\n"
+        f"Temperature readings: {json.dumps(temp_slice)}"
+    )
+    return invoke(prompt, system=_NARRATE_SYSTEM, max_tokens=512)
+
+
+# ── /ai/ask (AI-8 CUT-1) ─────────────────────────────────────────────────────
+
+_ASK_SYSTEM = (
+    "You are a food-safety HACCP assistant. Answer the question based only on the provided event log. "
+    "If the answer cannot be determined from the data, say so clearly. Be concise and factual."
+)
+
+
+def ask(question: str, events: list) -> str:
+    """Answer a natural-language question grounded in an event log slice."""
+    prompt = (
+        f"Event log ({len(events)} events):\n{json.dumps(events, indent=2)}\n\n"
+        f"Question: {question}"
+    )
+    return invoke(prompt, system=_ASK_SYSTEM, max_tokens=512)
