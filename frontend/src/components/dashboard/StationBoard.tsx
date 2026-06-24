@@ -10,11 +10,13 @@ interface Props {
 export default function StationBoard({ stations, onSeedDemo }: Props) {
   if (stations.length === 0) {
     return (
-      <EmptyState
-        title="No stations yet"
-        body="Connect a kiosk probe or seed demo data to see live readings."
-        onSeed={onSeedDemo}
-      />
+      <div className="flex h-full items-center justify-center">
+        <EmptyState
+          title="No stations yet"
+          body="Connect a kiosk probe or seed demo data to see live readings."
+          onSeed={onSeedDemo}
+        />
+      </div>
     )
   }
 
