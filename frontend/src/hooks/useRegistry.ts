@@ -43,8 +43,28 @@ export function useRegistry() {
       .channel(channelName.current)
       .on(
         'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'sites' },
+        () => supabase.from('sites').select('*').order('name').then(({ data }) => data && setSites(data))
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'sites' },
+        () => supabase.from('sites').select('*').order('name').then(({ data }) => data && setSites(data))
+      )
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'devices' },
         () => supabase.from('devices').select('*').then(({ data }) => data && setDevices(data))
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'stations' },
+        () => supabase.from('stations').select('*').then(({ data }) => data && setStations(data))
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'stations' },
+        () => supabase.from('stations').select('*').then(({ data }) => data && setStations(data))
       )
       .subscribe()
 
