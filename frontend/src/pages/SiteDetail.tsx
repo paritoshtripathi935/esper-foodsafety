@@ -50,7 +50,11 @@ function DeviceCard({ device, eventCountToday, siteId }: DeviceCardProps) {
     : "never";
 
   return (
-    <div className="flex flex-col gap-3 p-4 rounded-xl border border-outline-variant bg-surface-container">
+    <Link
+      to={`/sites/${siteId}/devices/${device.id}`}
+      className="flex flex-col gap-3 p-4 rounded-xl border border-outline-variant bg-surface-container
+        hover:bg-surface-container-high hover:border-primary/40 transition-colors cursor-pointer"
+    >
       {/* Top row: name + status pill */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -81,25 +85,7 @@ function DeviceCard({ device, eventCountToday, siteId }: DeviceCardProps) {
           Last seen {lastSeenLabel}
         </span>
       </div>
-
-      {/* Open link */}
-      <Link
-        to={`/sites/${siteId}/devices/${device.id}`}
-        className="self-start flex items-center gap-1 text-xs font-semibold text-primary
-          hover:text-primary/80 transition-colors"
-      >
-        Open
-        <svg
-          className="w-3 h-3"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
-    </div>
+    </Link>
   );
 }
 
