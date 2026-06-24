@@ -134,7 +134,7 @@ export default function AppShell() {
   }, [realtimeError]);
 
   useEffect(() => {
-    if (sites.length === 1 && selectedSite === null) {
+    if (sites.length > 0 && selectedSite === null) {
       setSelectedSite(sites[0].id);
     }
   }, [sites]);
