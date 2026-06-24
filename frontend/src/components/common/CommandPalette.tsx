@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Command } from 'cmdk'
 import { useNavigate } from 'react-router-dom'
 import type { Site, Device } from '../../hooks/useRegistry'
@@ -30,8 +30,13 @@ export default function CommandPalette({ sites, devices, onSeedDemo }: Props) {
         setOpen((v) => !v)
       }
     }
+    function onOpen() { setOpen(true) }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('open-command-palette', onOpen)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('open-command-palette', onOpen)
+    }
   }, [])
 
   const close = useCallback(() => {
@@ -119,7 +124,7 @@ export default function CommandPalette({ sites, devices, onSeedDemo }: Props) {
                   <CommandItem
                     key={site.id}
                     icon="🏢"
-                    label={site.name}
+                    label={site.name ?? site.id}
                     sub={site.address ?? undefined}
                     onSelect={() => go(`/sites/${site.id}`)}
                   />
@@ -136,8 +141,8 @@ export default function CommandPalette({ sites, devices, onSeedDemo }: Props) {
                     <CommandItem
                       key={device.id}
                       icon={device.kind === 'kiosk' ? '📱' : '🔌'}
-                      label={device.name}
-                      sub={site?.name}
+                      label={device.name ?? device.id}
+                      sub={site?.name ?? undefined}
                       onSelect={() => go(`/sites/${device.site_id}/devices/${device.id}`)}
                     />
                   )
@@ -176,11 +181,9 @@ interface ItemProps {
 }
 
 function CommandItem({ icon, label, sub, onSelect }: ItemProps) {
-  const ref = useRef<HTMLDivElement>(null)
   return (
     <Command.Item
-      ref={ref}
-      value={label}
+      value={label || ' '}
       onSelect={onSelect}
       className="flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm cursor-pointer
         text-on-surface aria-selected:bg-primary/10 aria-selected:text-primary
