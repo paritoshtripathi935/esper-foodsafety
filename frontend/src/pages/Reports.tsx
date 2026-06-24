@@ -130,10 +130,10 @@ function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps
     : siteId
 
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface-container overflow-hidden">
+    <div className="bg-surface-container overflow-hidden">
       {/* Main row */}
       <div
-        className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-surface-container-high transition-colors"
+        className="flex items-center gap-4 px-4 py-2.5 cursor-pointer hover:bg-surface-container-high transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
         {/* Chevron */}
@@ -145,7 +145,7 @@ function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps
         </svg>
 
         {/* Date */}
-        <p className="font-semibold text-on-surface w-32 shrink-0">
+        <p className="font-semibold text-on-surface w-40 shrink-0">
           {dateLabel}
           {isToday(parseISO(date)) && (
             <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider text-primary">Today</span>
@@ -284,7 +284,7 @@ export default function Reports() {
   )
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-5xl">
+    <div className="flex flex-col gap-6 p-6 max-w-7xl">
 
       {/* ── Header strip ── */}
       <div className="flex items-center gap-4 flex-wrap">
@@ -306,6 +306,18 @@ export default function Reports() {
           ))}
         </select>
 
+        {/* Refresh S3 list */}
+        <button
+          onClick={refreshS3}
+          title="Refresh S3 file list"
+          className="p-1.5 rounded-lg text-on-surface-variant border border-outline-variant
+            hover:bg-surface-container-high transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+
         {/* CTA — today's report */}
         <div className="ml-auto">
           <ExportButton
@@ -319,10 +331,10 @@ export default function Reports() {
       </div>
 
       {/* ── Two-column body ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
 
         {/* Column A: past-30-days list */}
-        <section className="flex flex-col gap-3">
+        <section className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wide">
             Last 30 days
           </h2>
@@ -334,16 +346,18 @@ export default function Reports() {
               onSeed={handleSeedDemo}
             />
           ) : (
-            byDate.map(([date, dayEvts]) => (
-              <DayCard
-                key={date}
-                date={date}
-                dayEvents={dayEvts}
-                siteId={siteFilter || 'all'}
-                addToast={addToast}
-                onUploaded={refreshS3}
-              />
-            ))
+            <div className="flex flex-col divide-y divide-outline-variant/30 rounded-xl overflow-hidden border border-outline-variant">
+              {byDate.map(([date, dayEvts]) => (
+                <DayCard
+                  key={date}
+                  date={date}
+                  dayEvents={dayEvts}
+                  siteId={siteFilter || 'all'}
+                  addToast={addToast}
+                  onUploaded={refreshS3}
+                />
+              ))}
+            </div>
           )}
         </section>
 

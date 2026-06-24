@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, NavLink, Navigate, useParams } from 'react-router-dom'
 import { format, formatDistanceToNow, parseISO, isToday } from 'date-fns'
 import clsx from 'clsx'
@@ -7,6 +7,8 @@ import { useRealtimeEvents } from '../hooks/useRealtimeEvents'
 import { useDerivedStationState } from '../hooks/useDerivedStationState'
 import TempCard from '../components/dashboard/TempCard'
 import PDFExportButton from '../components/pdf/PDFExportButton'
+import ErrorToast, { useToasts } from '../components/common/ErrorToast'
+import AddDeviceDialog from '../components/sites/AddDeviceDialog'
 import type { Device } from '../hooks/useRegistry'
 
 // ─── device helpers ──────────────────────────────────────────────────────────
@@ -90,6 +92,8 @@ export default function SiteDetail() {
   const { siteId } = useParams<{ siteId: string }>()
   const { sites, devices, stations: stationRegistry } = useRegistry()
   const { events } = useRealtimeEvents()
+  const { toasts, addToast, dismissToast } = useToasts()
+  const [showAddDevice, setShowAddDevice] = useState(false)
 
   const site = sites.find((s) => s.id === siteId)
   const siteDevices = devices.filter((d) => d.site_id === siteId)
@@ -185,10 +189,22 @@ export default function SiteDetail() {
 
       {/* ── Devices ── */}
       <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant mb-3">
-          Devices
-          <span className="ml-2 font-normal normal-case tracking-normal">({siteDevices.length})</span>
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant">
+            Devices
+            <span className="ml-2 font-normal normal-case tracking-normal">({siteDevices.length})</span>
+          </h2>
+          <button
+            onClick={() => setShowAddDevice(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+              bg-primary-container text-on-primary hover:opacity-90 transition-opacity"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Device
+          </button>
+        </div>
         {siteDevices.length === 0 ? (
           <p className="text-sm text-on-surface-variant">No devices registered for this site.</p>
         ) : (
@@ -227,6 +243,15 @@ export default function SiteDetail() {
           </div>
         )}
       </section>
+
+      {showAddDevice && siteId && (
+        <AddDeviceDialog
+          siteId={siteId}
+          onClose={() => setShowAddDevice(false)}
+          onSuccess={(msg) => addToast(msg)}
+        />
+      )}
+      <ErrorToast toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }

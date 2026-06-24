@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import AddSiteDialog from '../components/sites/AddSiteDialog'
 import { formatDistanceToNow, parseISO, isToday } from 'date-fns'
 import clsx from 'clsx'
 import { useDerivedStationState } from '../hooks/useDerivedStationState'
@@ -138,18 +139,38 @@ function SiteCard({ site, events, devices, stationRegistry }: SiteCardProps) {
 // ─── SitesIndex ───────────────────────────────────────────────────────────────
 
 export default function SitesIndex() {
-  const { events, sites, devices, stationRegistry, handleSeedDemo } =
+  const { events, sites, devices, stationRegistry, handleSeedDemo, addToast } =
     useOutletContext<ShellContext>()
+  const [showAddSite, setShowAddSite] = useState(false)
 
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-on-surface">Sites</h1>
-        <p className="text-sm text-on-surface-variant mt-0.5">
-          {sites.length} site{sites.length !== 1 ? 's' : ''} monitored
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-on-surface">Sites</h1>
+          <p className="text-sm text-on-surface-variant mt-0.5">
+            {sites.length} site{sites.length !== 1 ? 's' : ''} monitored
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAddSite(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold
+            bg-primary-container text-on-primary hover:opacity-90 transition-opacity shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Site
+        </button>
       </div>
+
+      {showAddSite && (
+        <AddSiteDialog
+          onClose={() => setShowAddSite(false)}
+          onSuccess={(msg) => addToast(msg)}
+        />
+      )}
 
       {sites.length === 0 ? (
         <EmptyState
