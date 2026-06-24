@@ -37,7 +37,7 @@ interface Props {
 }
 
 export default function TempCard({ state }: Props) {
-  const { station, latestTemp, openTimer, activeAlert } = state
+  const { name, latestTemp, openTimer, activeAlert } = state
   const status = statusColor(latestTemp, activeAlert !== null)
   const cls = STATUS_CLASSES[status]
 
@@ -52,7 +52,7 @@ export default function TempCard({ state }: Props) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider truncate">
-            {station.replace(/-/g, ' ')}
+            {name}
           </p>
           <div className="flex items-baseline gap-1 mt-1">
             {latestTemp !== null ? (

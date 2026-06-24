@@ -1,9 +1,15 @@
 import { useMemo } from 'react'
 import type { FoodSafetyEvent, StationState } from '../types'
+import type { Station } from './useRegistry'
+
+function slugToDisplayName(slug: string): string {
+  return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
 
 export function useDerivedStationState(
   events: FoodSafetyEvent[],
-  siteFilter: string | null
+  siteFilter: string | null,
+  stationRegistry: Station[] = []
 ): StationState[] {
   return useMemo(() => {
     const filtered = siteFilter
@@ -20,16 +26,17 @@ export function useDerivedStationState(
     const states: StationState[] = []
 
     for (const [key, stationEvents] of byStation) {
-      const [site_id, station] = key.split('::')
+      const [site_id, slug] = key.split('::')
       const sorted = [...stationEvents].sort(
         (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
       )
 
-      // Latest temp
+      const record = stationRegistry.find((s) => s.site_id === site_id && s.slug === slug)
+      const name = record?.name ?? slugToDisplayName(slug)
+
       const tempEvent = sorted.find((e) => e.type === 'temp')
       const latestTemp = tempEvent != null ? Number(tempEvent.value) : null
 
-      // Open timer: latest timer/start with no timer/complete or timer/breach after it
       const timerStarts = sorted.filter(
         (e) => e.type === 'timer' && (e.payload as Record<string, unknown>)?.event === 'start'
       )
@@ -54,23 +61,20 @@ export function useDerivedStationState(
         }
       }
 
-      // Active alert: latest type='alert' with no later corrective_action for same station
       const alerts = sorted.filter((e) => e.type === 'alert')
       let activeAlert: FoodSafetyEvent | null = null
       if (alerts.length > 0) {
         const latestAlert = alerts[0]
         const tAlert = new Date(latestAlert.ts).getTime()
         const hasCA = sorted.some(
-          (e) =>
-            e.type === 'corrective_action' &&
-            new Date(e.ts).getTime() > tAlert
+          (e) => e.type === 'corrective_action' && new Date(e.ts).getTime() > tAlert
         )
         if (!hasCA) activeAlert = latestAlert
       }
 
-      states.push({ station, site_id, latestTemp, openTimer, activeAlert })
+      states.push({ station: slug, name, site_id, latestTemp, openTimer, activeAlert })
     }
 
-    return states.sort((a, b) => a.station.localeCompare(b.station))
-  }, [events, siteFilter])
+    return states.sort((a, b) => a.name.localeCompare(b.name))
+  }, [events, siteFilter, stationRegistry])
 }

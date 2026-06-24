@@ -1,3 +1,5 @@
+export type { Site, Device, Station } from '../hooks/useRegistry'
+
 export type EventType = 'temp' | 'alert' | 'timer' | 'corrective_action'
 
 export interface FoodSafetyEvent {
@@ -12,13 +14,9 @@ export interface FoodSafetyEvent {
   payload: Record<string, unknown>
 }
 
-export interface Site {
-  id: string
-  name: string
-}
-
 export interface StationState {
   station: string
+  name: string
   site_id: string
   latestTemp: number | null
   openTimer: {

@@ -5,11 +5,14 @@ import type { FoodSafetyEvent } from '../types'
 const MAX_EVENTS = 500
 const INITIAL_FETCH = 200
 
+let eventsInstanceId = 0
+
 export function useRealtimeEvents() {
   const [events, setEvents] = useState<FoodSafetyEvent[]>([])
   const [error, setError] = useState<string | null>(null)
   const [connected, setConnected] = useState(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const channelName = useRef(`public:events-${++eventsInstanceId}`)
 
   useEffect(() => {
     let cancelled = false
@@ -33,7 +36,7 @@ export function useRealtimeEvents() {
 
       // Realtime subscription
       const channel = supabase
-        .channel('public:events')
+        .channel(channelName.current)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'events' },
