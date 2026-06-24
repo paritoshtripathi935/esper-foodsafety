@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   format,
@@ -8,12 +8,14 @@ import {
   endOfDay,
   subDays,
   isToday,
+  formatDistanceToNow,
 } from 'date-fns'
 import { pdf } from '@react-pdf/renderer'
 import clsx from 'clsx'
 import HACCPReport from '../components/pdf/HACCPReport'
 import EmptyState from '../components/common/EmptyState'
-import { uploadPdf } from '../services/ai'
+import { uploadPdf, listPdfs, presignPdf } from '../services/ai'
+import type { S3PdfFile } from '../services/ai'
 import type { FoodSafetyEvent, Site, Station } from '../types'
 
 // ─── outlet context ───────────────────────────────────────────────────────────
@@ -37,9 +39,10 @@ interface ExportButtonProps {
   date: string          // yyyy-MM-dd
   addToast: (msg: string) => void
   small?: boolean
+  onUploaded?: () => void
 }
 
-function ExportButton({ events, siteId, date, addToast, small }: ExportButtonProps) {
+function ExportButton({ events, siteId, date, addToast, small, onUploaded }: ExportButtonProps) {
   const [loading, setLoading] = useState(false)
 
   async function handleExport() {
@@ -61,6 +64,7 @@ function ExportButton({ events, siteId, date, addToast, small }: ExportButtonPro
       try {
         const result = await uploadPdf(blob, siteId, date)
         addToast(`Saved to S3: ${result.bucket}/${result.key}`)
+        onUploaded?.()
       } catch (err) {
         addToast(`Downloaded locally (S3 upload failed: ${(err as Error).message})`)
       }
@@ -100,9 +104,10 @@ interface DayCardProps {
   dayEvents: FoodSafetyEvent[]
   siteId: string  // 'all' or a real site id
   addToast: (msg: string) => void
+  onUploaded?: () => void
 }
 
-function DayCard({ date, dayEvents, siteId, addToast }: DayCardProps) {
+function DayCard({ date, dayEvents, siteId, addToast, onUploaded }: DayCardProps) {
   const [expanded, setExpanded] = useState(false)
 
   const alerts = dayEvents.filter((e) => e.type === 'alert')
@@ -169,6 +174,7 @@ function DayCard({ date, dayEvents, siteId, addToast }: DayCardProps) {
             date={date}
             addToast={addToast}
             small
+            onUploaded={onUploaded}
           />
         </div>
       </div>
@@ -216,11 +222,33 @@ function DayCard({ date, dayEvents, siteId, addToast }: DayCardProps) {
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
 
+function formatBytes(bytes: number): string {
+  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`
+  return `${Math.round(bytes / 1024)} KB`
+}
+
 export default function Reports() {
   const { events, sites, selectedSite, addToast, handleSeedDemo } =
     useOutletContext<ShellContext>()
 
   const [siteFilter, setSiteFilter] = useState<string>(selectedSite ?? '')
+
+  const [s3Files, setS3Files] = useState<S3PdfFile[]>([])
+  const [s3Loading, setS3Loading] = useState(false)
+  const [s3Error, setS3Error] = useState<string | null>(null)
+
+  function refreshS3() {
+    listPdfs(siteFilter || undefined).then(setS3Files).catch(() => {})
+  }
+
+  useEffect(() => {
+    setS3Loading(true)
+    setS3Error(null)
+    listPdfs(siteFilter || undefined)
+      .then(setS3Files)
+      .catch((e) => setS3Error(e.message))
+      .finally(() => setS3Loading(false))
+  }, [siteFilter])
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -285,6 +313,7 @@ export default function Reports() {
             siteId={exportSiteId}
             date={today}
             addToast={addToast}
+            onUploaded={refreshS3}
           />
         </div>
       </div>
@@ -312,27 +341,73 @@ export default function Reports() {
                 dayEvents={dayEvts}
                 siteId={siteFilter || 'all'}
                 addToast={addToast}
+                onUploaded={refreshS3}
               />
             ))
           )}
         </section>
 
-        {/* Column B: S3 placeholder */}
+        {/* Column B: S3 file list */}
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wide">
             Stored on S3
           </h2>
-          <div className="rounded-xl border border-outline-variant bg-surface-container p-5 text-center">
-            <svg className="w-8 h-8 mx-auto text-on-surface-variant opacity-40 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-            <p className="text-sm text-on-surface-variant">
-              Files appear here once uploaded.
-            </p>
-            <p className="text-xs text-on-surface-variant mt-1 opacity-70">
-              Export a report to see the S3 path in the toast notification.
-            </p>
-          </div>
+
+          {s3Loading && (
+            <div className="rounded-xl border border-outline-variant bg-surface-container p-5 flex items-center justify-center gap-2 text-sm text-on-surface-variant">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              Loading…
+            </div>
+          )}
+
+          {!s3Loading && s3Error && (
+            <div className="rounded-xl border border-error/30 bg-error-container/20 p-4 text-sm text-error">
+              Failed to load S3 files: {s3Error}
+            </div>
+          )}
+
+          {!s3Loading && !s3Error && s3Files.length === 0 && (
+            <div className="rounded-xl border border-outline-variant bg-surface-container p-5 text-center">
+              <svg className="w-8 h-8 mx-auto text-on-surface-variant opacity-40 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              <p className="text-sm text-on-surface-variant">No files yet.</p>
+              <p className="text-xs text-on-surface-variant mt-1 opacity-70">
+                Export a report to upload the first PDF.
+              </p>
+            </div>
+          )}
+
+          {!s3Loading && !s3Error && s3Files.length > 0 && (
+            <div className="rounded-xl border border-outline-variant bg-surface-container divide-y divide-outline-variant/50 overflow-hidden">
+              {s3Files.map((file) => (
+                <div key={file.key} className="flex items-start gap-3 px-4 py-3 hover:bg-surface-container-high transition-colors">
+                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-on-surface-variant" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-on-surface truncate">
+                      {file.date || file.key.split('/').pop()}
+                      {file.site_id && (
+                        <span className="ml-2 text-xs text-on-surface-variant font-normal">{file.site_id}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      {formatBytes(file.size)} · uploaded {formatDistanceToNow(parseISO(file.last_modified), { addSuffix: true })}
+                    </p>
+                  </div>
+                  <button
+                    className="shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary-container text-on-primary hover:bg-primary/80 transition-colors"
+                    onClick={() =>
+                      presignPdf(file.key).then((url) => window.open(url, '_blank'))
+                    }
+                  >
+                    Download
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 

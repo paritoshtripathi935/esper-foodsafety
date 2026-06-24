@@ -1,31 +1,45 @@
 package com.esper.probesimulator
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.esper.probesimulator.BuildConfig
 import com.esper.probesimulator.ble.GATTServer
 import com.esper.probesimulator.network.NetworkPoster
-import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
+import com.esper.probesimulator.scenarios.Scenario
+import com.esper.probesimulator.scenarios.ScenarioRunner
+import com.esper.probesimulator.ui.ProbeIdentity
+import com.esper.probesimulator.ui.ProbeSetupDialog
+import com.esper.probesimulator.ui.SimulatorContent
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+
+private const val PREFS_NAME  = "probe_identity"
+private const val KEY_STATION = "station_id"
+private const val KEY_DEVICE  = "device_id"
+private const val KEY_SITE    = "site_id"
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var gattServer: GATTServer
+    private lateinit var scenarioRunner: ScenarioRunner
+    private val activityScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val manualTemp  = MutableStateFlow(38.0f)
+    private val networkMode = MutableStateFlow(false)
+    private val lastStatus  = MutableStateFlow("Idle")
+
+    private var networkPollJob: Job? = null
+
+    // Probe identity — loaded from prefs, set via dialog on first run
+    private val probeIdentity = MutableStateFlow<ProbeIdentity?>(null)
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -36,117 +50,146 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Load persisted identity
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedStation = prefs.getString(KEY_STATION, null)
+        val savedDevice  = prefs.getString(KEY_DEVICE,  null)
+        val savedSite    = prefs.getString(KEY_SITE,    null)
+        if (savedStation != null && savedDevice != null && savedSite != null) {
+            probeIdentity.value = ProbeIdentity(savedStation, savedDevice, savedSite)
+        }
+
         gattServer = GATTServer(this)
 
-        setContent {
-            var temperature by remember { mutableFloatStateOf(38.0f) }
-            var networkMode by remember { mutableStateOf(false) }
-            var lastStatus by remember { mutableStateOf("Idle") }
-            val scope = rememberCoroutineScope()
-
-            LaunchedEffect(temperature, networkMode) {
-                if (!networkMode) {
-                    gattServer.updateTemperature(temperature)
-                }
-            }
-
-            LaunchedEffect(networkMode) {
-                if (networkMode) {
-                    gattServer.stop()
-                    lastStatus = "Network mode — tap Send"
-                } else {
-                    checkPermissionsAndStart()
-                    lastStatus = "BLE advertising"
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    elevation = CardDefaults.cardElevation(8.dp)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(24.dp)
-                    ) {
-                        Text(
-                            text = "BLE Probe Simulator",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        Spacer(Modifier.height(12.dp))
-
-                        // Mode toggle
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("BLE", style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.width(8.dp))
-                            Switch(checked = networkMode, onCheckedChange = { networkMode = it })
-                            Spacer(Modifier.width(8.dp))
-                            Text("Network (Supabase)", style = MaterialTheme.typography.bodyMedium)
-                        }
-
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = lastStatus,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (lastStatus.startsWith("Sent") || lastStatus == "BLE advertising")
-                                Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(Modifier.height(32.dp))
-
-                        Text(
-                            text = "%.1f °F".format(temperature),
-                            style = MaterialTheme.typography.displayLarge,
-                            fontWeight = FontWeight.Black
-                        )
-
-                        Spacer(Modifier.height(24.dp))
-
-                        Slider(
-                            value = temperature,
-                            onValueChange = { temperature = (it * 10f).roundToInt() / 10f },
-                            valueRange = 0f..120f
-                        )
-
-                        if (networkMode) {
-                            Spacer(Modifier.height(16.dp))
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        lastStatus = "Sending..."
-                                        val ok = NetworkPoster.postTempEvent(
-                                            supabaseUrl = BuildConfig.SUPABASE_URL,
-                                            anonKey = BuildConfig.SUPABASE_ANON_KEY,
-                                            tempF = temperature
-                                        )
-                                        lastStatus = if (ok) "Sent ✓ ${temperature}°F" else "Send failed — check Supabase config"
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Send to Supabase")
-                            }
-                        }
-                    }
-                }
+        scenarioRunner = ScenarioRunner { tempF ->
+            manualTemp.value = tempF
+            if (networkMode.value) {
+                activityScope.launch { postTemp(tempF) }
+            } else {
+                gattServer.updateTemperature(tempF)
             }
         }
+
+        setContent {
+            MaterialTheme {
+                val identity      by probeIdentity.collectAsState()
+                val isNetworkMode by networkMode.collectAsState()
+                val statusText    by lastStatus.collectAsState()
+
+                // Show setup dialog until identity is confirmed
+                if (identity == null) {
+                    ProbeSetupDialog(initial = null) { confirmed ->
+                        saveIdentity(confirmed)
+                        probeIdentity.value = confirmed
+                        // Register this probe-sim in the devices table
+                        activityScope.launch {
+                            NetworkPoster.upsertDevice(
+                                supabaseUrl = BuildConfig.SUPABASE_URL,
+                                anonKey     = BuildConfig.SUPABASE_ANON_KEY,
+                                deviceId    = confirmed.deviceId,
+                                siteId      = confirmed.siteId,
+                                deviceName  = "${confirmed.stationId} simulator",
+                            )
+                        }
+                    }
+                    return@MaterialTheme
+                }
+
+                LaunchedEffect(isNetworkMode) {
+                    if (isNetworkMode) {
+                        gattServer.stop()
+                        startNetworkPolling()
+                    } else {
+                        stopNetworkPolling()
+                        checkPermissionsAndStart()
+                        lastStatus.value = "BLE advertising"
+                    }
+                }
+
+                LaunchedEffect(manualTemp.collectAsState().value) {
+                    if (!isNetworkMode && scenarioRunner.currentScenario.value == null) {
+                        gattServer.updateTemperature(manualTemp.value)
+                    }
+                }
+
+                SimulatorContent(
+                    temperature = manualTemp,
+                    activeScenario = scenarioRunner.currentScenario,
+                    networkMode = isNetworkMode,
+                    lastStatus = statusText,
+                    isSending = false,
+                    probeIdentity = identity,
+                    onModeToggle = { on -> networkMode.value = on },
+                    onStartScenario = { scenario: Scenario ->
+                        stopNetworkPolling()
+                        scenarioRunner.start(scenario)
+                        lastStatus.value = "Running: ${scenario.name}"
+                    },
+                    onStopScenario = {
+                        scenarioRunner.stop()
+                        if (isNetworkMode) startNetworkPolling()
+                        lastStatus.value = if (isNetworkMode) "Network — posting" else "BLE advertising"
+                    },
+                    onManualTempChange = { t ->
+                        manualTemp.value = t
+                        if (!isNetworkMode) gattServer.updateTemperature(t)
+                    },
+                    onChangeIdentity = {
+                        // Show dialog again to re-configure
+                        probeIdentity.value = null
+                    },
+                )
+            }
+        }
+    }
+
+    private fun saveIdentity(identity: ProbeIdentity) {
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_STATION, identity.stationId)
+            .putString(KEY_DEVICE,  identity.deviceId)
+            .putString(KEY_SITE,    identity.siteId)
+            .apply()
+    }
+
+    private fun startNetworkPolling() {
+        networkPollJob?.cancel()
+        networkPollJob = activityScope.launch {
+            lastStatus.value = "Network — posting"
+            while (isActive) {
+                if (scenarioRunner.currentScenario.value == null) {
+                    postTemp(manualTemp.value)
+                }
+                delay(2_000L)
+            }
+        }
+    }
+
+    private fun stopNetworkPolling() {
+        networkPollJob?.cancel()
+        networkPollJob = null
+    }
+
+    private suspend fun postTemp(tempF: Float) {
+        val id = probeIdentity.value ?: return
+        val ok = NetworkPoster.postTempEvent(
+            supabaseUrl = BuildConfig.SUPABASE_URL,
+            anonKey     = BuildConfig.SUPABASE_ANON_KEY,
+            tempF       = tempF,
+            deviceId    = id.deviceId,
+            siteId      = id.siteId,
+            station     = id.stationId,
+            probeId     = id.deviceId,
+        )
+        lastStatus.value = if (ok)
+            "${id.stationId} — sent ${"%.1f".format(tempF)}°F ✓"
+        else
+            "${id.stationId} — send failed"
     }
 
     private fun checkPermissionsAndStart() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val hasAdvertise = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
-            val hasConnect = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            val hasConnect   = ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)   == PackageManager.PERMISSION_GRANTED
             if (hasAdvertise && hasConnect) gattServer.start()
             else requestPermissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT))
         } else {
@@ -157,5 +200,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         gattServer.stop()
+        scenarioRunner.clear()
+        stopNetworkPolling()
+        activityScope.cancel()
     }
 }

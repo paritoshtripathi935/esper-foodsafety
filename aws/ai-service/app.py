@@ -122,6 +122,17 @@ def ask(req: AskRequest):
     return {"answer": answer}
 
 
+@app.get("/pdf/list")
+def list_pdfs(site_id: Optional[str] = None, limit: int = 100):
+    prefix = f"haccp/{site_id}/" if site_id else "haccp/"
+    return {"items": s3_store.list_objects(prefix=prefix, limit=limit)}
+
+
+@app.get("/pdf/url")
+def pdf_url(key: str):
+    return {"url": s3_store.presign_get(key)}
+
+
 @app.post("/pdf")
 async def store_pdf(
     file: UploadFile = File(...),

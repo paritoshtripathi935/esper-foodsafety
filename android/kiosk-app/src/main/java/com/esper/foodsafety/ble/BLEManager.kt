@@ -43,15 +43,20 @@ class BLEManager(private val context: Context) {
 
     private var currentGatt: android.bluetooth.BluetoothGatt? = null
 
+    private var reconnectAttempts = 0
+    private val reconnectRunnable = Runnable { reconnectAttempts++; startScan() }
+
     private val gattCallback = GATTCallback(
         onConnectionStateChange = { isConnected ->
             if (isConnected) {
+                reconnectAttempts = 0
                 _connectionStatus.value = "Connected"
             } else {
                 _connectionStatus.value = "Disconnected"
                 _temperature.value = null
-                // Retry scanning if we disconnect
-                mainHandler.postDelayed({ startScan() }, 2000)
+                if (reconnectAttempts < 5) {
+                    mainHandler.postDelayed(reconnectRunnable, 2000L * (reconnectAttempts + 1))
+                }
             }
         },
         onTemperatureReceived = { tempF ->
@@ -108,6 +113,8 @@ class BLEManager(private val context: Context) {
     }
 
     fun stopAll() {
+        mainHandler.removeCallbacks(reconnectRunnable)
+        reconnectAttempts = 0
         stopScan()
         currentGatt?.close()
         currentGatt = null

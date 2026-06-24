@@ -20,6 +20,12 @@
       "Resource": "arn:aws:s3:::teamz-*/*"
     },
     {
+      "Sid": "HaccpPdfList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::teamz-*"
+    },
+    {
       "Sid": "SessionManagerAccess",
       "Effect": "Allow",
       "Action": [

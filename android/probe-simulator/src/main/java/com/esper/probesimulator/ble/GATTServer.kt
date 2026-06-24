@@ -149,8 +149,11 @@ class GATTServer(private val context: Context) {
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
             .build()
 
+        // Primary packet: service UUID only. No scan response — kiosk scans by UUID, not name.
+        // Including device name in a scan response alongside a 128-bit UUID pushes the combined
+        // payload past 31 bytes, causing ADVERTISE_FAILED_DATA_TOO_LARGE (error 1).
         val data = AdvertiseData.Builder()
-            .setIncludeDeviceName(true)
+            .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(TempService.SERVICE_UUID))
             .build()
 

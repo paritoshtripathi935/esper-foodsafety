@@ -50,3 +50,6 @@ openjdk.tar.gz
 
 # ── Claude Code internal ──────────────────────────────────────────────────────
 .claude/
+.agents/
+.mcp.json
+skills-lock.json

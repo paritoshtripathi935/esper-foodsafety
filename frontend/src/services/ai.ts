@@ -2,6 +2,29 @@ import type { FoodSafetyEvent } from '../types'
 
 const AI_BASE = (import.meta.env.VITE_AI_API_BASE as string) || ''
 
+export interface S3PdfFile {
+  key: string
+  size: number
+  last_modified: string
+  site_id: string
+  date: string
+}
+
+export async function listPdfs(siteId?: string): Promise<S3PdfFile[]> {
+  const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : ''
+  const res = await fetch(`${AI_BASE}/pdf/list${qs}`)
+  if (!res.ok) throw new Error(`list pdfs ${res.status}`)
+  const data = await res.json()
+  return data.items as S3PdfFile[]
+}
+
+export async function presignPdf(key: string): Promise<string> {
+  const res = await fetch(`${AI_BASE}/pdf/url?key=${encodeURIComponent(key)}`)
+  if (!res.ok) throw new Error(`presign ${res.status}`)
+  const data = await res.json()
+  return data.url
+}
+
 export async function narrateIncident(
   alert: FoodSafetyEvent,
   correctiveAction: Record<string, unknown>,
