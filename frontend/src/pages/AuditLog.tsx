@@ -155,6 +155,7 @@ function VirtualTable({ rows, sites, devices, expandedId, onToggle }: VirtualTab
             deviceName={devices[e.device_id] ?? e.device_id}
             expanded={expandedId === e.id}
             onToggle={onToggle}
+            rowIndex={startIdx + i}
             style={{ position: 'absolute', top: (startIdx + i) * ROW_HEIGHT, left: 0, right: 0 }}
           />
         ))}
@@ -172,15 +173,18 @@ interface RowProps {
   expanded: boolean
   onToggle: (e: FoodSafetyEvent) => void
   style?: React.CSSProperties
+  rowIndex?: number
 }
 
-function TableRow({ event: e, siteName, deviceName, expanded, onToggle, style }: RowProps) {
+function TableRow({ event: e, siteName, deviceName, expanded, onToggle, style, rowIndex = 0 }: RowProps) {
+  const isOdd = rowIndex % 2 !== 0
   return (
     <div style={style}>
       <div
         onClick={() => onToggle(e)}
         className={clsx(
           'grid items-center gap-2 px-4 text-xs cursor-pointer border-b border-outline-variant/50 transition-colors',
+          !expanded && !e.type.includes('alert') && isOdd && 'bg-surface-container',
           'hover:bg-surface-container-high',
           expanded && 'bg-surface-container-high',
           e.type === 'alert' && 'bg-error-container/10 hover:bg-error-container/20',
