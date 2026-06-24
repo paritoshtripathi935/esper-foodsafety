@@ -19,6 +19,7 @@ export interface StationState {
   name: string
   site_id: string
   latestTemp: number | null
+  recentTemps: number[]
   openTimer: {
     batch_label: string
     hold_minutes: number

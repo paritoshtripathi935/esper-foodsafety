@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, NavLink, Navigate, useParams } from 'react-router-dom'
+import Breadcrumb from '../components/common/Breadcrumb'
 import { format, formatDistanceToNow, parseISO, isToday } from 'date-fns'
 import clsx from 'clsx'
 import { useRegistry } from '../hooks/useRegistry'
@@ -135,56 +136,36 @@ export default function SiteDetail() {
   const siteEvents = events.filter((e) => e.site_id === siteId)
 
   return (
-    <div className="flex flex-col gap-8 p-6 max-w-6xl">
+    <div className="flex flex-col gap-8 p-6 max-w-[1400px]">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-3">
-        {/* Top row */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <Link
-            to="/sites"
-            className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            All sites
-          </Link>
+      <div className="sticky top-0 z-10 bg-surface-container/95 backdrop-blur border-b border-outline-variant -mx-6 px-6 py-4">
+        <div className="flex flex-col gap-2">
+          <Breadcrumb trail={[{ label: 'Sites', to: '/sites' }, { label: site.name }]} />
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold text-on-surface">{site.name}</h1>
 
-          <h1 className="text-2xl font-bold text-on-surface">{site.name}</h1>
+            {(site.address || site.timezone) && (
+              <span className="text-sm text-on-surface-variant">
+                {[site.address, site.timezone].filter(Boolean).join(' · ')}
+              </span>
+            )}
 
-          {/* Edit — disabled placeholder */}
-          <button
-            disabled
-            title="Editing not available yet"
-            className="p-1.5 rounded-lg text-on-surface-variant opacity-40 cursor-not-allowed"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-          </button>
+            <div className="ml-auto flex items-center gap-3">
+              {/* Last-data chip */}
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs
+                bg-surface-container-high border border-outline-variant text-on-surface-variant">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {lastEventTs
+                  ? `Last data ${formatDistanceToNow(parseISO(lastEventTs), { addSuffix: true })}`
+                  : 'No data yet'}
+              </span>
 
-          <div className="ml-auto flex items-center gap-3">
-            {/* Last-data chip */}
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs
-              bg-surface-container-high border border-outline-variant text-on-surface-variant">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {lastEventTs
-                ? `Last data ${formatDistanceToNow(parseISO(lastEventTs), { addSuffix: true })}`
-                : 'No data yet'}
-            </span>
-
-            <PDFExportButton events={siteEvents} siteId={site.id} date={today} />
+              <PDFExportButton events={siteEvents} siteId={site.id} date={today} />
+            </div>
           </div>
         </div>
-
-        {/* Address / timezone */}
-        {(site.address || site.timezone) && (
-          <p className="text-sm text-on-surface-variant">
-            {[site.address, site.timezone].filter(Boolean).join(' · ')}
-          </p>
-        )}
       </div>
 
       {/* ── Devices ── */}
