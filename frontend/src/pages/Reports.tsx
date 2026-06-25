@@ -274,11 +274,17 @@ export default function Reports() {
     const alerts30 = windowEvents.filter((e) => e.type === 'alert').length
     const cas30    = windowEvents.filter((e) => e.type === 'corrective_action').length
     const activeDays = byDate.length
-    const compliance = (100 - (alerts30 / Math.max(windowEvents.length, 1)) * 100).toFixed(1)
+
+    // Compliance = share of active days with no temperature breach. Intuitive,
+    // matches the per-day "Compliant" badges, and isn't diluted by temp volume.
+    const daysWithAlert = byDate.filter(([, evts]) => evts.some((e) => e.type === 'alert')).length
+    const compliance = (((activeDays - daysWithAlert) / Math.max(activeDays, 1)) * 100).toFixed(1)
 
     const last7Start  = startOfDay(subDays(new Date(), 6))
     const prior7Start = startOfDay(subDays(new Date(), 13))
-    const prior7End   = endOfDay(subDays(new Date(), 6))
+    // End the prior-7 window the day BEFORE last-7 begins, so day −6 isn't
+    // double-counted in both buckets.
+    const prior7End   = endOfDay(subDays(new Date(), 7))
 
     const alerts7 = windowEvents.filter(
       (e) => e.type === 'alert' && parseISO(e.ts) >= last7Start
