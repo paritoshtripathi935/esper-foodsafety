@@ -190,6 +190,7 @@ function Bubble({ msg, onRetry }: BubbleProps) {
           prose-code:text-primary prose-code:bg-surface-container prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-code:before:content-none prose-code:after:content-none
           prose-pre:bg-surface-container prose-pre:rounded-xl prose-pre:text-xs prose-pre:overflow-x-auto
           prose-table:text-xs prose-th:text-on-surface prose-td:text-on-surface prose-th:font-semibold
+          [&_table]:w-full [&_th]:text-left [&_td]:text-left [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5
           prose-a:text-primary prose-a:underline
           prose-blockquote:border-primary prose-blockquote:text-on-surface-variant
           [&_p]:my-3 [&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:font-bold [&_h3]:mt-4 [&_h3]:mb-1.5 [&_h3]:font-bold

@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import { supabase } from '../services/supabase'
 import type { FoodSafetyEvent } from '../types'
 
@@ -66,7 +67,7 @@ export async function seedDemo(): Promise<void> {
   }
 
   // Alert: walk-in-cooler-1 threshold crossed ~2 hours ago
-  const alertId = crypto.randomUUID()
+  const alertId = uuidv4()
   const alertTs = minsAgo(120)
   events.push({
     device_id: DEVICE,
