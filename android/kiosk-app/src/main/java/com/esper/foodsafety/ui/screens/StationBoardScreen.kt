@@ -76,7 +76,8 @@ fun StationBoardScreen(
 
     if (showTimerModal) {
         HoldTimerModal(
-            onStart = { label, mins, sta ->
+            stations  = stationMap.keys.toList(),
+            onStart   = { label, mins, sta ->
                 onStartTimer(label, mins, sta)
                 showTimerModal = false
             },

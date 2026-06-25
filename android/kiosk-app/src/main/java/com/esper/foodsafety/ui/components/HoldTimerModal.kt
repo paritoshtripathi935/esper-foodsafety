@@ -38,16 +38,31 @@ private val STATION_OPTIONS = listOf(
  * Full-screen overlay modal matching the Stitch "Start Hold Timer Modal" design.
  * Max-width 640dp centered dialog with station picker, batch label field,
  * duration presets, and a custom +/- stepper.
+ *
+ * @param stations Live station IDs from the kiosk. Falls back to [STATION_OPTIONS] when empty.
  */
 @Composable
 fun HoldTimerModal(
+    stations: List<String> = emptyList(),
     onStart: (batchLabel: String, holdMinutes: Int, station: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // Build display pairs: (id, label). Use live stations when available, fallback otherwise.
+    val stationPairs: List<Pair<String, String>> = remember(stations) {
+        if (stations.isNotEmpty()) {
+            stations.map { id ->
+                id to id.replace('-', ' ').split(' ')
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+            }
+        } else {
+            STATION_OPTIONS
+        }
+    }
+
     var batchLabel by remember { mutableStateOf("") }
     var holdMinutes by remember { mutableIntStateOf(60) }
     var selectedPreset by remember { mutableIntStateOf(60) }
-    var station by remember { mutableStateOf(STATION_OPTIONS.first().first) }
+    var station by remember(stationPairs) { mutableStateOf(stationPairs.first().first) }
     var stationMenuOpen by remember { mutableStateOf(false) }
 
     Dialog(
@@ -119,7 +134,7 @@ fun HoldTimerModal(
                                 ) {
                                     Text("🍽", fontSize = 20.sp)
                                     Text(
-                                        STATION_OPTIONS.first { it.first == station }.second,
+                                        stationPairs.firstOrNull { it.first == station }?.second ?: station,
                                         color = OnSurface,
                                         fontSize = 18.sp,
                                     )
@@ -130,7 +145,7 @@ fun HoldTimerModal(
                                 expanded = stationMenuOpen,
                                 onDismissRequest = { stationMenuOpen = false },
                             ) {
-                                STATION_OPTIONS.forEach { (id, label) ->
+                                stationPairs.forEach { (id, label) ->
                                     DropdownMenuItem(
                                         text = { Text(label) },
                                         onClick = { station = id; stationMenuOpen = false },

@@ -33,6 +33,7 @@ import com.esper.foodsafety.ui.screens.ProbePairingScreen
 import com.esper.foodsafety.ui.screens.SetupScreen
 import com.esper.foodsafety.ui.screens.SettingsScreen
 import com.esper.foodsafety.ui.screens.StationBoardScreen
+import com.esper.foodsafety.ui.screens.TimersScreen
 import com.esper.foodsafety.voice.VoiceLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -242,6 +243,13 @@ class MainActivity : KioskActivity() {
             }
 
             when (currentScreen) {
+                "Timers" -> TimersScreen(
+                    timers         = timerManager.timers,
+                    onStartTimer   = { label, mins, station -> timerManager.start(label, mins, station) },
+                    onCompleteTimer = { id -> timerManager.complete(id) },
+                    activeStations = _stationTemps.value.keys.toList(),
+                    onBack         = { currentScreen = "Board" },
+                )
                 "History" -> EventHistoryScreen(onBack = { currentScreen = "Board" })
                 "Reports" -> HACCPReportsScreen(onBack = { currentScreen = "Board" })
                 "Settings" -> SettingsScreen(
