@@ -190,6 +190,9 @@ export default function Overview() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
+        <h2 className="text-sm font-medium text-on-surface-variant uppercase tracking-wide mb-5">
+          Devices
+        </h2>
         <StationBoard stations={stations} onSeedDemo={handleSeedDemo} />
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { NavLink } from 'react-router-dom'
 import type { StationState } from '../../types'
 import TempCard from './TempCard'
 import EmptyState from '../common/EmptyState'
@@ -23,7 +24,13 @@ export default function StationBoard({ stations, onSeedDemo }: Props) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
       {stations.map((s) => (
-        <TempCard key={`${s.site_id}::${s.station}`} state={s} />
+        <NavLink
+          key={`${s.site_id}::${s.station}`}
+          to={`/sites/${s.site_id}/stations/${s.station}`}
+          className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <TempCard state={s} />
+        </NavLink>
       ))}
     </div>
   )
