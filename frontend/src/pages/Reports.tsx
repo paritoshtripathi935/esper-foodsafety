@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
   format,
@@ -297,13 +297,7 @@ export default function Reports() {
   const [s3Loading, setS3Loading] = useState(false);
   const [s3Error, setS3Error] = useState<string | null>(null);
 
-  function refreshS3() {
-    listPdfs(siteFilter || undefined)
-      .then(setS3Files)
-      .catch(() => {});
-  }
-
-  useEffect(() => {
+  const refreshS3 = useCallback(() => {
     setS3Loading(true);
     setS3Error(null);
     listPdfs(siteFilter || undefined)
@@ -311,6 +305,10 @@ export default function Reports() {
       .catch((e) => setS3Error(e.message))
       .finally(() => setS3Loading(false));
   }, [siteFilter]);
+
+  useEffect(() => {
+    refreshS3();
+  }, [refreshS3]);
 
   const today = format(new Date(), "yyyy-MM-dd");
   const windowStart = startOfDay(subDays(new Date(), 29));
