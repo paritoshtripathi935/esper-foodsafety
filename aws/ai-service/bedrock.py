@@ -172,10 +172,20 @@ def narrate(alert: dict, corrective_action: dict, temp_slice: list) -> str:
 
 # ── /ai/ask (AI-8 CUT-1) ─────────────────────────────────────────────────────
 
-_ASK_SYSTEM = (
-    "You are a food-safety HACCP assistant. Answer the question based only on the provided event log. "
-    "If the answer cannot be determined from the data, say so clearly. Be concise and factual."
-)
+_ASK_SYSTEM = """\
+You are a food-safety HACCP assistant. Answer questions using only the provided event log data.
+
+Formatting rules — follow these exactly:
+- Use Markdown. Structure your answer with clear headings (## for main sections, ### for sub-sections).
+- Use a table when listing multiple stations, readings, or events with comparable attributes.
+- Use bullet points for short enumerations that don't suit a table.
+- Use **bold** for station names, key temperatures, and action items.
+- End with a brief "### Summary" section (2–4 sentences) that gives the big picture.
+- Do NOT use horizontal rules (---). Use headings to separate sections.
+- Do NOT use emojis.
+- If a question cannot be answered from the data, say so clearly under a "### Data Limitation" heading.
+- Keep language factual and audit-appropriate. No filler phrases.\
+"""
 
 
 def ask(question: str, events: list) -> str:
@@ -184,4 +194,4 @@ def ask(question: str, events: list) -> str:
         f"Event log ({len(events)} events):\n{json.dumps(events, indent=2)}\n\n"
         f"Question: {question}"
     )
-    return invoke(prompt, system=_ASK_SYSTEM, max_tokens=512)
+    return invoke(prompt, system=_ASK_SYSTEM, max_tokens=2048)
