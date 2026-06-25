@@ -19,6 +19,10 @@ import { useRealtimeEvents } from "../hooks/useRealtimeEvents";
 import AlertDetail from "../components/alerts/AlertDetail";
 import type { FoodSafetyEvent } from "../types";
 
+// Cold-chain max temp (°F) applied when a station isn't in the registry, so the
+// reference line + above-threshold highlighting work for any live station.
+const DEFAULT_MAX_TEMP_F = 41;
+
 // ─── zone badge ───────────────────────────────────────────────────────────────
 
 const ZONE_LABEL = {
@@ -118,6 +122,15 @@ export default function StationDetail() {
       ? stationSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
       : "");
 
+  // Effective thresholds. A registered station is trusted as-is (its max may be
+  // null for hot stations). An UNregistered station — i.e. a live device sending
+  // a station name not yet in the registry — falls back to the cold-chain default
+  // so the reference line + above-threshold highlighting still work.
+  const maxTempF = stationRecord
+    ? stationRecord.max_temp_f
+    : DEFAULT_MAX_TEMP_F;
+  const minTempF = stationRecord?.min_temp_f ?? null;
+
   // All events for this site+station.
   // event.station is the raw identifier used both as the URL param (stationSlug)
   // and as station.slug in the registry, so filter on stationSlug — not the display name.
@@ -142,12 +155,10 @@ export default function StationDetail() {
             ts: new Date(e.ts).getTime(),
             value,
             alertValue:
-              stationRecord?.max_temp_f != null && value > stationRecord.max_temp_f
-                ? value
-                : null,
+              maxTempF != null && value > maxTempF ? value : null,
           };
         }),
-    [stationEvents, cutoff, stationRecord],
+    [stationEvents, cutoff, maxTempF],
   );
 
   // Annotation events in same 24h window
@@ -167,18 +178,16 @@ export default function StationDetail() {
     [stationEvents, cutoff],
   );
 
-// Y-axis domain: pad ±5° around data range, also include thresholds
+  // Y-axis domain: pad ±5° around data range, also include thresholds
   const yDomain = useMemo((): [number | string, number | string] => {
     const values = chartData.map((d) => d.value);
-    if (stationRecord?.max_temp_f != null)
-      values.push(stationRecord.max_temp_f);
-    if (stationRecord?.min_temp_f != null)
-      values.push(stationRecord.min_temp_f);
+    if (maxTempF != null) values.push(maxTempF);
+    if (minTempF != null) values.push(minTempF);
     if (values.length === 0) return ["auto", "auto"];
     const lo = Math.min(...values);
     const hi = Math.max(...values);
     return [Math.floor(lo - 5), Math.ceil(hi + 5)];
-  }, [chartData, stationRecord]);
+  }, [chartData, maxTempF, minTempF]);
 
   // Current temp
   const currentTemp = useMemo(() => {
@@ -275,20 +284,20 @@ export default function StationDetail() {
             )}
 
             {/* Threshold chips */}
-            {stationRecord?.max_temp_f != null && (
+            {maxTempF != null && (
               <span
                 className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs
                 bg-error-container/40 text-error border border-error/20"
               >
-                Max {stationRecord.max_temp_f}°F
+                Max {maxTempF}°F
               </span>
             )}
-            {stationRecord?.min_temp_f != null && (
+            {minTempF != null && (
               <span
                 className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs
                 bg-tertiary/10 text-tertiary border border-tertiary/20"
               >
-                Min {stationRecord.min_temp_f}°F
+                Min {minTempF}°F
               </span>
             )}
 
@@ -352,28 +361,28 @@ export default function StationDetail() {
               <Tooltip content={<ChartTooltip />} />
 
               {/* Threshold reference lines */}
-              {stationRecord?.max_temp_f != null && (
+              {maxTempF != null && (
                 <ReferenceLine
-                  y={stationRecord.max_temp_f}
+                  y={maxTempF}
                   stroke="var(--color-error, #ef4444)"
                   strokeOpacity={0.6}
                   strokeDasharray="5 3"
                   label={{
-                    value: `max ${stationRecord.max_temp_f}°F`,
+                    value: `max ${maxTempF}°F`,
                     position: "insideTopRight",
                     fontSize: 10,
                     fill: "var(--color-error, #ef4444)",
                   }}
                 />
               )}
-              {stationRecord?.min_temp_f != null && (
+              {minTempF != null && (
                 <ReferenceLine
-                  y={stationRecord.min_temp_f}
+                  y={minTempF}
                   stroke="var(--color-tertiary, #b45309)"
                   strokeOpacity={0.6}
                   strokeDasharray="5 3"
                   label={{
-                    value: `min ${stationRecord.min_temp_f}°F`,
+                    value: `min ${minTempF}°F`,
                     position: "insideBottomRight",
                     fontSize: 10,
                     fill: "var(--color-tertiary, #b45309)",
@@ -381,18 +390,47 @@ export default function StationDetail() {
                 />
               )}
 
-              {/* Temp line — full trace */}
+              {/* Temp line — full trace. Dots are drawn here (not the overlay) so a
+                  lone reading is always visible: red if above threshold, primary otherwise. */}
               <Line
                 type="monotone"
                 dataKey="value"
                 stroke="var(--color-primary, #6366f1)"
                 strokeWidth={2}
-                dot={false}
+                isAnimationActive={false}
+                dot={(props: {
+                  cx: number;
+                  cy: number;
+                  payload: { value: number };
+                  index: number;
+                }) => {
+                  const { cx, cy, payload, index } = props;
+                  const above = maxTempF != null && payload.value > maxTempF;
+                  // Draw a dot when above threshold (red), or when it's the only
+                  // point (so a single reading isn't invisible). Otherwise keep the
+                  // line clean.
+                  if (!above && chartData.length !== 1) return <g key={index} />;
+                  return (
+                    <circle
+                      key={index}
+                      cx={cx}
+                      cy={cy}
+                      r={4}
+                      fill={
+                        above
+                          ? "var(--color-error, #ef4444)"
+                          : "var(--color-primary, #6366f1)"
+                      }
+                      stroke="var(--color-surface-container, #1e1e2e)"
+                      strokeWidth={1.5}
+                    />
+                  );
+                }}
                 activeDot={{ r: 4, strokeWidth: 0 }}
               />
 
-              {/* Above-threshold overlay — red segment + explicit dots at each violating reading */}
-              {stationRecord?.max_temp_f != null && (
+              {/* Above-threshold overlay — red segment over consecutive violations. */}
+              {maxTempF != null && (
                 <Line
                   type="monotone"
                   dataKey="alertValue"
@@ -400,20 +438,7 @@ export default function StationDetail() {
                   strokeWidth={2.5}
                   connectNulls={false}
                   isAnimationActive={false}
-                  dot={(props: { cx: number; cy: number; value: number | null; index: number }) => {
-                    if (props.value == null) return <g key={props.index} />;
-                    return (
-                      <circle
-                        key={props.index}
-                        cx={props.cx}
-                        cy={props.cy}
-                        r={4}
-                        fill="var(--color-error, #ef4444)"
-                        stroke="var(--color-surface-container, #1e1e2e)"
-                        strokeWidth={1.5}
-                      />
-                    );
-                  }}
+                  dot={false}
                   activeDot={false}
                 />
               )}
