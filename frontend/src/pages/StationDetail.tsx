@@ -118,11 +118,13 @@ export default function StationDetail() {
       ? stationSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
       : "");
 
-  // All events for this site+station
+  // All events for this site+station.
+  // event.station is the raw identifier used both as the URL param (stationSlug)
+  // and as station.slug in the registry, so filter on stationSlug — not the display name.
   const stationEvents = useMemo(
     () =>
-      events.filter((e) => e.site_id === siteId && e.station === stationName),
-    [events, siteId, stationName],
+      events.filter((e) => e.site_id === siteId && e.station === stationSlug),
+    [events, siteId, stationSlug],
   );
 
   // Last-24h temp data points for the chart — recomputed on every render so the window slides with realtime updates
@@ -195,27 +197,53 @@ export default function StationDetail() {
     [stationEvents],
   );
 
-  // X-axis: tick every 2 hours across the full 24h window
-  const xTicks = useMemo(() => {
-    const ticks: number[] = [];
-    const cursor = new Date(cutoff);
-    cursor.setMinutes(0, 0, 0);
-    cursor.setSeconds(0, 0);
-    cursor.setHours(cursor.getHours() + 1); // first full hour after window start
-    while (cursor.getTime() <= now) {
-      ticks.push(cursor.getTime());
-      cursor.setHours(cursor.getHours() + 2);
+  // X-axis domain + ticks fit the actual data range so clustered points spread
+  // out instead of collapsing into a single dot on the full 24h span.
+  const { xDomain, xTicks } = useMemo(() => {
+    if (chartData.length === 0) {
+      return { xDomain: [cutoff, now] as [number, number], xTicks: [] as number[] };
     }
-    return ticks;
-  }, [cutoff, now]);
+
+    const first = chartData[0].ts;
+    const last = chartData[chartData.length - 1].ts;
+    const span = last - first;
+
+    // Single point (or all same timestamp): open a small window around it.
+    if (span <= 0) {
+      const pad = 15 * 60_000; // ±15 min
+      return {
+        xDomain: [first - pad, last + pad] as [number, number],
+        xTicks: [first],
+      };
+    }
+
+    // Pick a "nice" tick interval aiming for ~6 ticks across the span.
+    const MINUTE = 60_000;
+    const HOUR = 60 * MINUTE;
+    const NICE = [
+      MINUTE, 5 * MINUTE, 10 * MINUTE, 15 * MINUTE, 30 * MINUTE,
+      HOUR, 2 * HOUR, 3 * HOUR, 6 * HOUR, 12 * HOUR,
+    ];
+    const interval = NICE.find((i) => span / i <= 6) ?? NICE[NICE.length - 1];
+
+    // Pad domain by half an interval so end points aren't flush against the edge.
+    const pad = interval / 2;
+    const lo = first - pad;
+    const hi = last + pad;
+
+    const ticks: number[] = [];
+    for (let t = Math.ceil(lo / interval) * interval; t <= hi; t += interval) {
+      ticks.push(t);
+    }
+
+    return { xDomain: [lo, hi] as [number, number], xTicks: ticks };
+  }, [chartData, cutoff, now]);
 
   // Navigate away if registry loaded and site/station not found
   if (sites.length > 0 && !site) return <Navigate to="/sites" replace />;
   if (stationRegistry.length > 0 && !stationRecord && stationSlug) {
     // Station may only be in events, not the registry — don't hard-redirect
   }
-
-  console.log(recentEvents);
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-[1400px]">
@@ -298,7 +326,7 @@ export default function StationDetail() {
                 dataKey="ts"
                 scale="time"
                 type="number"
-                domain={[cutoff, now]}
+                domain={xDomain}
                 ticks={xTicks}
                 tickFormatter={(v) => format(new Date(v), "HH:mm")}
                 tick={{

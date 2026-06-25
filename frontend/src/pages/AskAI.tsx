@@ -184,16 +184,17 @@ function Bubble({ msg, onRetry }: BubbleProps) {
   return (
     <div className="flex justify-start">
       <div className="max-w-2xl flex flex-col gap-1">
-        <div className="px-4 py-2.5 rounded-2xl rounded-tl-sm bg-surface-container-high text-on-surface text-sm leading-relaxed prose prose-sm max-w-none
-          prose-headings:text-on-surface prose-headings:font-semibold
-          prose-p:text-on-surface prose-p:my-1
+        <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-surface-container-high text-on-surface text-sm leading-relaxed prose prose-sm max-w-none
+          prose-headings:text-on-surface prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2 prose-headings:first:mt-0
+          prose-p:text-on-surface prose-p:my-2
           prose-strong:text-on-surface
-          prose-li:text-on-surface prose-li:my-0.5
+          prose-ul:my-2 prose-ol:my-2 prose-li:text-on-surface prose-li:my-1
+          prose-hr:border-outline-variant prose-hr:my-6
           prose-code:text-primary prose-code:bg-surface-container prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-code:before:content-none prose-code:after:content-none
           prose-pre:bg-surface-container prose-pre:rounded-xl prose-pre:text-xs prose-pre:overflow-x-auto
           prose-table:text-xs prose-th:text-on-surface prose-td:text-on-surface prose-th:font-semibold
           prose-a:text-primary prose-a:underline
-          prose-blockquote:border-primary prose-blockquote:text-on-surface-variant prose-hr:border-outline-variant">
+          prose-blockquote:border-primary prose-blockquote:text-on-surface-variant">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
         </div>
         <div className="flex items-center gap-2 px-1">

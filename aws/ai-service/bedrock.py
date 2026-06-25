@@ -181,6 +181,7 @@ Formatting rules — follow these exactly:
 - Use bullet points for short enumerations that don't suit a table.
 - Use **bold** for station names, key temperatures, and action items.
 - End with a brief "### Summary" section (2–4 sentences) that gives the big picture.
+- Do NOT use horizontal rules (---). Use headings to separate sections.
 - Do NOT use emojis.
 - If a question cannot be answered from the data, say so clearly under a "### Data Limitation" heading.
 - Keep language factual and audit-appropriate. No filler phrases.\
